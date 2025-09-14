@@ -2,8 +2,10 @@ import os
 import re
 
 import requests
+from crewai.tools import tool
 
 
+@tool
 def web_search_tool(query: str) -> str:
     """
     Search the web for information.
@@ -53,6 +55,3 @@ def web_search_tool(query: str) -> str:
         cleaned_chunks.append(cleaned_result)
 
     return cleaned_chunks
-
-
-print(web_search_tool("remote jobs in korea"))
