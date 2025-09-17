@@ -67,3 +67,10 @@ def web_search_tool(query: str) -> str:
         cleaned_chunks.append(cleaned_result)
 
     return cleaned_chunks
+
+
+def save_report_to_md(content: str) -> str:
+    """Save report content to report.md file."""
+    with open("report.md", "w") as f:
+        f.write(content)
+    return "report.md"
