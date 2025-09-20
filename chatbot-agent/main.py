@@ -83,9 +83,20 @@ async def paint_history():
                         for part in content:
                             if "image_url" in part:
                                 st.image(part["image_url"])
+                            elif "text" in part:
+                                st.write(part["text"])
                 else:
-                    if message["type"] == "message":
-                        st.write(message["content"][0]["text"].replace("$", "\$"))
+                    if message.get("type") == "message":
+                        content = message.get("content")
+                        if isinstance(content, list) and len(content) > 0:
+                            if "text" in content[0]:
+                                st.write(content[0]["text"].replace("$", r"\$"))
+                        elif isinstance(content, str):
+                            st.write(content.replace("$", r"\$"))
+                    elif "content" in message and isinstance(message["content"], str):
+                        st.write(message["content"].replace("$", r"\$"))
+
+        # 도구 사용 상태 표시
         if "type" in message:
             message_type = message["type"]
             if message_type == "web_search_call":
@@ -95,9 +106,10 @@ async def paint_history():
                 with st.chat_message("ai"):
                     st.write("🗂️ Searched your files...")
             elif message_type == "image_generation_call":
-                image = base64.b64decode(message["result"])
-                with st.chat_message("ai"):
-                    st.image(image)
+                if "result" in message:
+                    image = base64.b64decode(message["result"])
+                    with st.chat_message("ai"):
+                        st.image(image)
 
 
 asyncio.run(paint_history())
@@ -177,7 +189,7 @@ async def run_agent(message):
 
                 if event.data.type == "response.output_text.delta":
                     response += event.data.delta
-                    text_placeholder.write(response.replace("$", "\$"))
+                    text_placeholder.write(response.replace("$", r"\$"))
 
                 if event.data.type == "response.code_interpreter_call_code.delta":
                     code_response += event.data.delta
