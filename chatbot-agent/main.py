@@ -16,6 +16,7 @@ from agents import (
     SQLiteSession,
     WebSearchTool,
 )
+from agents.mcp.server import MCPServerStdio
 from display_utils import display_tool_list
 from openai import OpenAI
 
@@ -23,53 +24,6 @@ client = OpenAI()
 
 VECTOR_STORE_ID = "vs_68cd486ef178819197fdd7e0bf9c0aad"
 
-
-if "agent" not in st.session_state:
-    st.session_state["agent"] = Agent(
-        name="Chatbot agent",
-        instructions="""
-        You are a helpful assistant.
-
-        You have access to the following tools:
-            - Web Search Tool: Use this when the user asks a questions that isn't in your training data. Use this tool when the users asks about current or future events, when you think you don't know the answer, try searching for it in the web first.
-            - File Search Tool: Use this tool when the user asks a question about facts related to themselves. Or when they ask questions about specific files.
-            - Code Interpreter Tool: Use this tool when you need to write and run code to answer the user's question.
-        """,
-        tools=[
-            WebSearchTool(),
-            FileSearchTool(
-                vector_store_ids=[VECTOR_STORE_ID],
-                max_num_results=3,
-            ),
-            ImageGenerationTool(
-                tool_config={
-                    "type": "image_generation",
-                    "quality": "low",
-                    "output_format": "jpeg",
-                    "moderation": "low",
-                    "partial_images": 1,
-                }
-            ),
-            CodeInterpreterTool(
-                tool_config={
-                    "type": "code_interpreter",
-                    "container": {
-                        "type": "auto",
-                    },
-                }
-            ),
-            HostedMCPTool(
-                tool_config={
-                    "server_url": "https://mcp.context7.com/mcp",
-                    "type": "mcp",
-                    "server_label": "Context7",
-                    "server_description": "Use this to get the docs from software projects.",
-                    "require_approval": "never",
-                }
-            ),
-        ],
-    )
-agent = st.session_state["agent"]
 
 if "session" not in st.session_state:
     st.session_state["session"] = SQLiteSession(
@@ -213,39 +167,97 @@ def update_status(status_container, event):
 
 
 async def run_agent(message):
-    with st.chat_message("ai"):
-        status_container = st.status("⌛", expanded=False)
-        code_placeholder = st.empty()
-        text_placeholder = st.empty()
-        image_placeholder = st.empty()
-        response = ""
-        code_response = ""
+    yfinance_server = MCPServerStdio(
+        params={
+            "command": "uvx",
+            "args": ["mcp-yahoo-finance"],
+        },
+        cache_tools_list=True,
+    )
 
-        st.session_state["code_placeholder"] = code_placeholder
-        st.session_state["image_placeholder"] = image_placeholder
-        st.session_state["text_placeholder"] = text_placeholder
+    async with yfinance_server:
+        agent = Agent(
+            mcp_servers=[yfinance_server],
+            name="Chatbot agent",
+            instructions="""
+            You are a helpful assistant.
 
-        stream = Runner.run_streamed(
-            agent,
-            message,
-            session=session,
+            You have access to the following tools:
+                - Web Search Tool: Use this when the user asks a questions that isn't in your training data. Use this tool when the users asks about current or future events, when you think you don't know the answer, try searching for it in the web first.
+                - File Search Tool: Use this tool when the user asks a question about facts related to themselves. Or when they ask questions about specific files.
+                - Code Interpreter Tool: Use this tool when you need to write and run code to answer the user's question.
+            """,
+            tools=[
+                WebSearchTool(),
+                FileSearchTool(
+                    vector_store_ids=[VECTOR_STORE_ID],
+                    max_num_results=3,
+                ),
+                ImageGenerationTool(
+                    tool_config={
+                        "type": "image_generation",
+                        "quality": "low",
+                        "output_format": "jpeg",
+                        "moderation": "low",
+                        "partial_images": 1,
+                    }
+                ),
+                CodeInterpreterTool(
+                    tool_config={
+                        "type": "code_interpreter",
+                        "container": {
+                            "type": "auto",
+                        },
+                    }
+                ),
+                HostedMCPTool(
+                    tool_config={
+                        "server_url": "https://mcp.context7.com/mcp",
+                        "type": "mcp",
+                        "server_label": "Context7",
+                        "server_description": "Use this to get the docs from software projects.",
+                        "require_approval": "never",
+                    }
+                ),
+            ],
         )
 
-        async for event in stream.stream_events():
-            if event.type == "raw_response_event":
-                update_status(status_container, event.data.type)
+        with st.chat_message("ai"):
+            status_container = st.status("⌛", expanded=False)
+            code_placeholder = st.empty()
+            text_placeholder = st.empty()
+            image_placeholder = st.empty()
+            response = ""
+            code_response = ""
 
-                if event.data.type == "response.output_text.delta":
-                    response += event.data.delta
-                    text_placeholder.write(response.replace("$", r"\$"))
+            st.session_state["code_placeholder"] = code_placeholder
+            st.session_state["image_placeholder"] = image_placeholder
+            st.session_state["text_placeholder"] = text_placeholder
 
-                if event.data.type == "response.code_interpreter_call_code.delta":
-                    code_response += event.data.delta
-                    code_placeholder.code(code_response)
+            stream = Runner.run_streamed(
+                agent,
+                message,
+                session=session,
+            )
 
-                elif event.data.type == "response.image_generation_call.partial_image":
-                    image = base64.b64decode(event.data.partial_image_b64)
-                    image_placeholder.image(image)
+            async for event in stream.stream_events():
+                if event.type == "raw_response_event":
+                    update_status(status_container, event.data.type)
+
+                    if event.data.type == "response.output_text.delta":
+                        response += event.data.delta
+                        text_placeholder.write(response.replace("$", r"\$"))
+
+                    if event.data.type == "response.code_interpreter_call_code.delta":
+                        code_response += event.data.delta
+                        code_placeholder.code(code_response)
+
+                    elif (
+                        event.data.type
+                        == "response.image_generation_call.partial_image"
+                    ):
+                        image = base64.b64decode(event.data.partial_image_b64)
+                        image_placeholder.image(image)
 
 
 prompt = st.chat_input(
