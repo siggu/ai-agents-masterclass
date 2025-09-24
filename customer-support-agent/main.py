@@ -4,17 +4,9 @@ dotenv.load_dotenv()
 import asyncio
 
 import streamlit as st
-from agents import RunContextWrapper, Runner, SQLiteSession, function_tool
+from agents import Runner, SQLiteSession
 from models import UserAccountContext
 from openai import OpenAI
-
-
-@function_tool
-def get_user_tier(wrapper: RunContextWrapper[UserAccountContext]):
-    return (
-        f"The user {wrapper.context.customer_id} has a {wrapper.context.tier} account."
-    )
-
 
 client = OpenAI()
 
