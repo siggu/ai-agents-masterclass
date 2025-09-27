@@ -4,19 +4,32 @@ dotenv.load_dotenv()
 import asyncio
 
 import streamlit as st
-from agents import InputGuardrailTripwireTriggered, Runner, SQLiteSession
+from agents import Agent, InputGuardrailTripwireTriggered, Runner, SQLiteSession
 from models import UserAccountContext
+from my_agents.account_agent import account_agent
+from my_agents.billing_agent import billing_agent
+from my_agents.order_agent import order_agent
+from my_agents.technical_agent import technical_agent
 from my_agents.triage_agent import triage_agent
 from openai import OpenAI
 
 client = OpenAI()
 
+# 에이전트 매핑
+AGENTS = {
+    "Account Agent": account_agent,
+    "Billing Agent": billing_agent,
+    "Order Agent": order_agent,
+    "Technical Agent": technical_agent,
+    "Triage Agent": triage_agent,
+}
+
 user_account_ctx = UserAccountContext(
     customer_id=1,
     name="Jeongmok",
     tier="basic",
+    email="jeongmok@example.com",  # email 추가
 )
-
 
 if "session" not in st.session_state:
     st.session_state["session"] = SQLiteSession(
@@ -25,11 +38,21 @@ if "session" not in st.session_state:
     )
 session = st.session_state["session"]
 
+if "current_agent" not in st.session_state:
+    st.session_state.current_agent: Agent = triage_agent
+
+if "handoff_info" not in st.session_state:
+    st.session_state.handoff_info = None
+
 
 async def paint_history():
     messages = await session.get_items()
     for message in messages:
         if "role" in message:
+            if message["role"] == "system":
+                st.info(message["content"])
+                continue
+
             with st.chat_message(message["role"]):
                 if message["role"] == "user":
                     st.write(message["content"])
@@ -41,49 +64,152 @@ async def paint_history():
 asyncio.run(paint_history())
 
 
-async def run_agent(message):
-
+async def run_agent(message, is_handoff_continuation=False):
     with st.chat_message("ai"):
         text_placeholder = st.empty()
         response = ""
-
-        st.session_state["text_placeholder"] = text_placeholder
+        handoff_detected = False
 
         try:
             stream = Runner.run_streamed(
-                triage_agent,
+                st.session_state.current_agent,
                 message,
                 session=session,
                 context=user_account_ctx,
             )
 
+            # 모든 이벤트 로깅 (디버깅용)
             async for event in stream.stream_events():
-                if event.type == "raw_response_event":
+                # 디버그: 모든 이벤트 타입 확인
+                if event.type not in ["raw_response_event"]:
+                    print(f"DEBUG - Event type: {event.type}")
 
+                # 텍스트 응답
+                if event.type == "raw_response_event":
                     if event.data.type == "response.output_text.delta":
                         response += event.data.delta
                         text_placeholder.write(response.replace("$", "\$"))
-        except InputGuardrailTripwireTriggered:
-            st.write("I can't help you with that.")
+
+                    # response.done 이벤트에서 tool 사용 확인
+                    elif event.data.type == "response.done":
+                        print(f"DEBUG - Response done event")
+                        # 여기서 handoff 확인
+
+                # Tool 관련 이벤트들 (여러 가능성)
+                elif event.type in [
+                    "tool_use",
+                    "tool_calls",
+                    "function_call",
+                    "action",
+                ]:
+                    print(f"DEBUG - Tool event detected: {event.type}")
+                    handoff_detected = True
+
+            # 대안: pending_handoff로 직접 확인
+            if not handoff_detected and "pending_handoff" in st.session_state:
+                print("DEBUG - Handoff detected via pending_handoff")
+                handoff_info = st.session_state.pending_handoff
+
+                # 에이전트 이름 매칭
+                target_name = handoff_info.get("to_agent", "").replace(
+                    "Management Specialist", "Agent"
+                )
+
+                if "Account" in target_name:
+                    st.session_state.current_agent = account_agent
+                    st.success(f"🔄 Transferred to Account Agent")
+                    del st.session_state.pending_handoff
+
+                    # 자동 응답 트리거
+                    context_msg = f"""Customer needs password reset help.
+                    Email: {handoff_info.get('issue', '')}"""
+
+                    # 재귀 호출 방지를 위한 플래그
+                    if not is_handoff_continuation:
+                        await run_agent(context_msg, is_handoff_continuation=True)
+
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 
-message = st.chat_input(
-    "Write a message for your assistant",
-)
+async def handle_user_message(message):
+    """사용자 메시지 처리"""
+    # 원본 메시지를 pending_handoff에 저장 (handoff 시 사용)
+    if "pending_handoff" not in st.session_state:
+        st.session_state.original_user_message = message
+
+    await run_agent(message)
+
+
+# 채팅 입력
+message = st.chat_input("Write a message for your assistant")
 
 if message:
-
     if "text_placeholder" in st.session_state:
         st.session_state["text_placeholder"].empty()
 
     if message:
         with st.chat_message("human"):
             st.write(message)
-        asyncio.run(run_agent(message))
+        asyncio.run(handle_user_message(message))
 
-
+# 사이드바
 with st.sidebar:
-    reset = st.button("Reset memory")
+    st.title("💬 Customer Support Chat")
+
+    reset = st.button("🔄 Reset Conversation")
     if reset:
         asyncio.run(session.clear_session())
-    st.write(asyncio.run(session.get_items()))
+        st.session_state.current_agent = triage_agent
+        if "pending_handoff" in st.session_state:
+            del st.session_state.pending_handoff
+        if "original_user_message" in st.session_state:
+            del st.session_state.original_user_message
+        st.rerun()
+
+    st.write("---")
+
+    # 현재 에이전트 상태
+    st.write("### 🤖 Agent Status")
+    if "current_agent" in st.session_state:
+        agent_name = st.session_state.current_agent.name
+
+        # 에이전트별 색상/아이콘
+        agent_icons = {
+            "Triage Agent": "🎯",
+            "Account Agent": "👤",
+            "Billing Agent": "💰",
+            "Order Agent": "📦",
+            "Technical Agent": "🔧",
+        }
+
+        icon = agent_icons.get(agent_name, "🤖")
+        st.success(f"{icon} **{agent_name}**")
+
+        # Handoff 가능한 에이전트 표시
+        if (
+            hasattr(st.session_state.current_agent, "handoffs")
+            and st.session_state.current_agent.handoffs
+        ):
+            with st.expander("Available Transfers"):
+                for h in st.session_state.current_agent.handoffs:
+                    if hasattr(h, "agent"):
+                        transfer_agent = h.agent.name
+                        transfer_icon = agent_icons.get(transfer_agent, "→")
+                        st.write(f"{transfer_icon} {transfer_agent}")
+
+    # Handoff 정보 표시
+    if "pending_handoff" in st.session_state and st.session_state.pending_handoff:
+        st.write("---")
+        st.write("### 🔄 Handoff Info")
+        info = st.session_state.pending_handoff
+        st.write(f"**To:** {info.get('to_agent', 'N/A')}")
+        st.write(f"**Reason:** {info.get('reason', 'N/A')}")
+        st.write(f"**Issue:** {info.get('issue', 'N/A')}")
+
+    st.write("---")
+
+    # 디버그용 대화 기록 (토글)
+    with st.expander("📜 Session History (Debug)"):
+        history = asyncio.run(session.get_items())
+        st.json(history)
