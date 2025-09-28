@@ -1,5 +1,7 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
+from output_guardrails import account_output_guardrail
+from input_guardrails import off_topic_guardrail
 from tools import (
     AgentToolUsageLoggingHooks,
     deactivate_account,
@@ -61,4 +63,6 @@ account_agent = Agent(
         export_account_data,
     ],
     hooks=AgentToolUsageLoggingHooks(),
+    input_guardrails=[off_topic_guardrail],
+    output_guardrails=[account_output_guardrail],
 )

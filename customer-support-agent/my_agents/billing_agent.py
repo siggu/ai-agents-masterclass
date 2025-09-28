@@ -1,5 +1,7 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
+from output_guardrails import billing_output_guardrail
+from input_guardrails import off_topic_guardrail
 from tools import (
     AgentToolUsageLoggingHooks,
     apply_billing_credit,
@@ -53,4 +55,6 @@ billing_agent = Agent(
         apply_billing_credit,
     ],
     hooks=AgentToolUsageLoggingHooks(),
+    input_guardrails=[off_topic_guardrail],
+    output_guardrails=[billing_output_guardrail],
 )

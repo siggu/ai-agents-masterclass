@@ -1,5 +1,7 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
+from output_guardrails import order_output_guardrail
+from input_guardrails import off_topic_guardrail
 from tools import (AgentToolUsageLoggingHooks, expedite_shipping,
                    initiate_return_process, lookup_order_status,
                    schedule_redelivery)
@@ -48,4 +50,6 @@ order_agent = Agent(
         expedite_shipping,
     ],
     hooks=AgentToolUsageLoggingHooks(),
+    input_guardrails=[off_topic_guardrail],
+    output_guardrails=[order_output_guardrail],
 )

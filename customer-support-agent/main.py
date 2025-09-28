@@ -5,7 +5,7 @@ import asyncio
 import json
 
 import streamlit as st
-from agents import Agent, InputGuardrailTripwireTriggered, Runner, SQLiteSession
+from agents import Agent, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered, Runner, SQLiteSession
 from models import UserAccountContext
 from my_agents.account_agent import account_agent
 from my_agents.billing_agent import billing_agent
@@ -112,7 +112,19 @@ async def run_agent(message, is_handoff_continuation=False):
 
                         st.session_state["text_placeholder"] = text_placeholder
                         response = ""
+        except OutputGuardrailTripwireTriggered as e:
+            # Output guardrail이 트리거되면 출력된 텍스트를 모두 지우고 에러 메시지만 표시
+            text_placeholder.empty()
+            st.error(f"⚠️ Content blocked by security guardrail: {e.guardrail_result.guardrail.__class__.__name__}")
+            st.info("The response was blocked because it contained inappropriate content for this agent.")
+        except InputGuardrailTripwireTriggered as e:
+            text_placeholder.empty()
+            st.error(f"⚠️ Input blocked by security guardrail: {e.guardrail_result.guardrail.__class__.__name__}")
+            st.info("Your request was blocked because it's not appropriate for this support system.")
         except Exception as e:
+            if "text_placeholder" in st.session_state:
+                st.session_state["text_placeholder"].empty()
+            text_placeholder.empty()
             st.error(f"Error: {e}")
 
 

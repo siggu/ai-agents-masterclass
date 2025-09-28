@@ -1,39 +1,9 @@
 import streamlit as st
-from agents import (Agent, GuardrailFunctionOutput, RunContextWrapper, Runner,
-                    handoff, input_guardrail)
+from agents import (Agent, handoff, RunContextWrapper)
 from agents.extensions import handoff_filters
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
-from models import HandoffData, InputGuardRailOutput, UserAccountContext
-from my_agents.account_agent import account_agent
-from my_agents.billing_agent import billing_agent
-from my_agents.order_agent import order_agent
-from my_agents.technical_agent import technical_agent
-
-input_guardrail_agent = Agent(
-    name="Input Guardrail Agent",
-    instructions="""
-    Ensure the user's request specifically pertains to User Account details, Billing inquiries, Order information, or Technical Support issues, and is not off-topic. If the request is off-topic, return a reason for the tripwire. You can make small conversation with the user, specially at the beginning of the conversation, but don't help with requests that are not related to User Account details, Billing inquiries, Order information, or Technical Support issues.
-""",
-    output_type=InputGuardRailOutput,
-)
-
-
-@input_guardrail
-async def off_topic_guardrail(
-    wrapper: RunContextWrapper[UserAccountContext],
-    agent: Agent[UserAccountContext],
-    input: str,
-):
-    result = await Runner.run(
-        input_guardrail_agent,
-        input,
-        context=wrapper.context,
-    )
-
-    return GuardrailFunctionOutput(
-        output_info=result.final_output,
-        tripwire_triggered=result.final_output.is_off_topic,
-    )
+from models import HandoffData, UserAccountContext
+from input_guardrails import off_topic_guardrail
 
 
 def dynamic_triage_agent_instructions(
@@ -160,17 +130,32 @@ technical_agent_description = """Transfer to Technical Agent for: product errors
 order_agent_description = """Transfer to Order Agent for: order status inquiries, shipping questions, delivery issues, returns, exchanges, missing items, wrong items, tracking numbers, or product availability."""
 
 
+# Lazy import to avoid circular dependency
+def _get_agents():
+    from my_agents.account_agent import account_agent
+    from my_agents.billing_agent import billing_agent
+    from my_agents.order_agent import order_agent
+    from my_agents.technical_agent import technical_agent
+    return account_agent, billing_agent, order_agent, technical_agent
+
+
 # Triage Agent 정의
-triage_agent = Agent(
-    name="Triage Agent",
-    instructions=dynamic_triage_agent_instructions,
-    input_guardrails=[
-        off_topic_guardrail,
-    ],
-    handoffs=[
-        make_handoff(account_agent, account_agent_description),
-        make_handoff(billing_agent, billing_agent_description),
-        make_handoff(technical_agent, technical_agent_description),
-        make_handoff(order_agent, order_agent_description),
-    ],
-)
+def _create_triage_agent():
+    account_agent, billing_agent, order_agent, technical_agent = _get_agents()
+
+    return Agent(
+        name="Triage Agent",
+        instructions=dynamic_triage_agent_instructions,
+        input_guardrails=[
+            off_topic_guardrail,
+        ],
+        handoffs=[
+            make_handoff(account_agent, account_agent_description),
+            make_handoff(billing_agent, billing_agent_description),
+            make_handoff(technical_agent, technical_agent_description),
+            make_handoff(order_agent, order_agent_description),
+        ],
+    )
+
+
+triage_agent = _create_triage_agent()

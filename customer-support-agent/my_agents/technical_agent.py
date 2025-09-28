@@ -1,5 +1,7 @@
 from agents import Agent, RunContextWrapper
 from models import UserAccountContext
+from output_guardrails import technical_output_guardrail
+from input_guardrails import off_topic_guardrail
 from tools import (
     AgentToolUsageLoggingHooks,
     escalate_to_engineering,
@@ -51,4 +53,6 @@ technical_agent = Agent(
         escalate_to_engineering,
     ],
     hooks=AgentToolUsageLoggingHooks(),
+    input_guardrails=[off_topic_guardrail],
+    output_guardrails=[technical_output_guardrail],
 )
