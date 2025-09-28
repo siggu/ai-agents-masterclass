@@ -2,6 +2,7 @@ import dotenv
 
 dotenv.load_dotenv()
 import asyncio
+import json
 
 import streamlit as st
 from agents import Agent, InputGuardrailTripwireTriggered, Runner, SQLiteSession
@@ -38,8 +39,8 @@ if "session" not in st.session_state:
     )
 session = st.session_state["session"]
 
-if "current_agent" not in st.session_state:
-    st.session_state.current_agent: Agent = triage_agent
+if "agent" not in st.session_state:
+    st.session_state.agent: Agent = triage_agent
 
 if "handoff_info" not in st.session_state:
     st.session_state.handoff_info = None
@@ -58,7 +59,14 @@ async def paint_history():
                     st.write(message["content"])
                 else:
                     if message["type"] == "message":
-                        st.write(message["content"][0]["text"].replace("$", "\$"))
+                        raw_text = message["content"][0]["text"]
+                        try:
+                            parsed_data = json.loads(raw_text)
+                            display_text = parsed_data.get("message", raw_text)
+                        except json.JSONDecodeError:
+                            display_text = raw_text
+
+                        st.write(display_text.replace("$", "\$"))
 
 
 asyncio.run(paint_history())
@@ -68,11 +76,10 @@ async def run_agent(message, is_handoff_continuation=False):
     with st.chat_message("ai"):
         text_placeholder = st.empty()
         response = ""
-        handoff_detected = False
 
         try:
             stream = Runner.run_streamed(
-                st.session_state.current_agent,
+                st.session_state.agent,
                 message,
                 session=session,
                 context=user_account_ctx,
@@ -95,39 +102,16 @@ async def run_agent(message, is_handoff_continuation=False):
                         print(f"DEBUG - Response done event")
                         # 여기서 handoff 확인
 
-                # Tool 관련 이벤트들 (여러 가능성)
-                elif event.type in [
-                    "tool_use",
-                    "tool_calls",
-                    "function_call",
-                    "action",
-                ]:
-                    print(f"DEBUG - Tool event detected: {event.type}")
-                    handoff_detected = True
+                elif event.type == "agent_updated_stream_event":
+                    if st.session_state.agent.name != event.new_agent.name:
+                        st.write(
+                            f"🤖 transferred from {st.session_state.agent.name} to {event.new_agent.name}"
+                        )
+                        st.session_state.agent = event.new_agent
+                        text_placeholder = st.empty()
 
-            # 대안: pending_handoff로 직접 확인
-            if not handoff_detected and "pending_handoff" in st.session_state:
-                print("DEBUG - Handoff detected via pending_handoff")
-                handoff_info = st.session_state.pending_handoff
-
-                # 에이전트 이름 매칭
-                target_name = handoff_info.get("to_agent", "").replace(
-                    "Management Specialist", "Agent"
-                )
-
-                if "Account" in target_name:
-                    st.session_state.current_agent = account_agent
-                    st.success(f"🔄 Transferred to Account Agent")
-                    del st.session_state.pending_handoff
-
-                    # 자동 응답 트리거
-                    context_msg = f"""Customer needs password reset help.
-                    Email: {handoff_info.get('issue', '')}"""
-
-                    # 재귀 호출 방지를 위한 플래그
-                    if not is_handoff_continuation:
-                        await run_agent(context_msg, is_handoff_continuation=True)
-
+                        st.session_state["text_placeholder"] = text_placeholder
+                        response = ""
         except Exception as e:
             st.error(f"Error: {e}")
 
@@ -160,7 +144,7 @@ with st.sidebar:
     reset = st.button("🔄 Reset Conversation")
     if reset:
         asyncio.run(session.clear_session())
-        st.session_state.current_agent = triage_agent
+        st.session_state.agent = triage_agent
         if "pending_handoff" in st.session_state:
             del st.session_state.pending_handoff
         if "original_user_message" in st.session_state:
@@ -171,8 +155,8 @@ with st.sidebar:
 
     # 현재 에이전트 상태
     st.write("### 🤖 Agent Status")
-    if "current_agent" in st.session_state:
-        agent_name = st.session_state.current_agent.name
+    if "agent" in st.session_state:
+        agent_name = st.session_state.agent.name
 
         # 에이전트별 색상/아이콘
         agent_icons = {
@@ -188,11 +172,11 @@ with st.sidebar:
 
         # Handoff 가능한 에이전트 표시
         if (
-            hasattr(st.session_state.current_agent, "handoffs")
-            and st.session_state.current_agent.handoffs
+            hasattr(st.session_state.agent, "handoffs")
+            and st.session_state.agent.handoffs
         ):
             with st.expander("Available Transfers"):
-                for h in st.session_state.current_agent.handoffs:
+                for h in st.session_state.agent.handoffs:
                     if hasattr(h, "agent"):
                         transfer_agent = h.agent.name
                         transfer_icon = agent_icons.get(transfer_agent, "→")
