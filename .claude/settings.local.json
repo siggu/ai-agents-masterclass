@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv pip:*)",
+      "Bash(findstr:*)",
+      "Bash(.venvScriptspython.exe -m pip list)",
+      "Bash(\".venv\\Scripts\\python.exe\" -m pip list)",
+      "Bash(uv run:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
