@@ -157,10 +157,30 @@ def human_feedback(state: State):
         }
     )
     user_feedback = answer["user_feedback"]
-    chosen_thumbnail_number = answer["chosen_thumbnail_number"]
+
+    # --- START OF FIX ---
+
+    # Get the user's choice. Default to "1" if it's an empty string or None.
+    chosen_thumbnail_number_str = answer.get("chosen_thumbnail_number") or "1"
+
+    try:
+        # Try to convert the string to a number
+        chosen_thumbnail_number = int(chosen_thumbnail_number_str)
+
+        # Check if the number is within the valid range of prompts we have
+        if not (1 <= chosen_thumbnail_number <= len(state["thumbnail_prompts"])):
+            # If it's out of range (e.g., 0, 4, 5), default to 1
+            chosen_thumbnail_number = 1
+
+    except ValueError:
+        # If the input wasn't a number at all (e.g., "abc"), default to 1
+        chosen_thumbnail_number = 1
+
+        # --- END OF FIX ---
 
     return {
         "user_feedback": user_feedback,
+        # Now, chosen_thumbnail_number is guaranteed to be a valid integer (e.g., 1, 2, or 3)
         "chosen_prompt": state["thumbnail_prompts"][chosen_thumbnail_number - 1],
     }
 
