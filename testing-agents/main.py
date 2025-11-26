@@ -49,11 +49,3 @@ graph_builder.add_edge("assign_priority", "draft_response")
 graph_builder.add_edge("draft_response", END)
 
 graph = graph_builder.compile()
-
-result = graph.invoke(
-    {
-        "email": "This is an urgent request for a discount offer.",
-    }
-)
-
-print(result)
