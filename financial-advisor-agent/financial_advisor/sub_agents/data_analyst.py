@@ -156,6 +156,7 @@ data_analyst = LlmAgent(
     여러 전문 도구를 사용하여 다양한 유형의 데이터를 수집합니다.
     각 도구가 제공하는 정보를 설명하고 명확하게 제시합니다.
     """,
+    output_key="data_analysis_results",
     tools=[
         get_company_info,
         get_stock_price,

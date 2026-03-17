@@ -163,6 +163,7 @@ financial_analyst = Agent(
     포괄적인 재무제표 데이터를 사용하여 기업의 재무 건전성과 성과를 분석합니다.
     기업의 재무 강점을 나타내는 핵심 재무 비율, 추세 및 지표에 집중합니다.
     """,
+    output_key="financial_analysis_results",
     tools=[
         get_income_statement,
         get_balance_sheet,
