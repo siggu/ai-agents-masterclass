@@ -51,11 +51,14 @@ async def assemble_video(tool_context: ToolContext) -> str:
 
         for scene_id in scene_ids:
             image_name = f"scene_{scene_id}_image.jpeg"
-            audio_name = f"scene_{scene_id}_narration.mp3"
             if image_name in existing_artifacts:
                 image_files.append(image_name)
-            if audio_name in existing_artifacts:
-                audio_files.append(audio_name)
+            # mp3(OpenAI) 또는 wav(GenAI) 둘 다 지원
+            for ext in ("mp3", "wav"):
+                audio_name = f"scene_{scene_id}_narration.{ext}"
+                if audio_name in existing_artifacts:
+                    audio_files.append(audio_name)
+                    break
 
         print(f"🖼️ Found {len(image_files)} image artifacts")
         print(f"🎵 Found {len(audio_files)} audio artifacts")
