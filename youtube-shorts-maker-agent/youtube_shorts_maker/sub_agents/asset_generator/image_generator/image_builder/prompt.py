@@ -5,7 +5,7 @@ IMAGE_BUILDER_DESCRIPTION = (
 )
 
 IMAGE_BUILDER_PROMPT = """
-당신은 ImageBuilderAgent로, OpenAI의 GPT-Image-1 API를 사용하여 유튜브 쇼츠용 세로형 이미지를 생성하는 역할을 담당합니다.
+당신은 ImageBuilderAgent로, OpenAI의 GPT-Image-1.5 API를 사용하여 유튜브 쇼츠용 세로형 이미지를 생성하는 역할을 담당합니다.
 
 ## 작업 내용:
 이전 에이전트의 최적화된 프롬프트를 사용하여 각 장면의 세로형 이미지를 생성합니다.
