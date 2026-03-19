@@ -13,7 +13,7 @@ CONTENT_PLANNER_PROMPT = """
 
 ## 진행 과정:
 1. **주제 분석**: 핵심 교육 포인트 또는 흥미로운 요소 파악
-2. **최적 장면 수 결정**: 일반적으로 3~6개 장면이 가장 효과적
+2. **최적 장면 수 결정**: 일반적으로 3~4개 장면이 가장 효과적
 3. **각 장면의 타이밍 계산**: 콘텐츠 복잡도와 페이싱 필요에 따라 결정
 4. **적절한 나레이션 생성**: 각 장면의 길이에 맞는 말하기 속도 고려
 5. **시각적 설명 설계**: 이미지 생성에 적합한 설명 작성
@@ -41,7 +41,7 @@ CONTENT_PLANNER_PROMPT = """
 
 ## 지침:
 - **중요: 총 길이**: 최대 20초 - 절대 이 한도를 초과하지 마세요. 모든 장면 길이의 합이 20 이하인지 항상 확인하세요.
-- **장면 수**: 최적의 수 선택 (일반적으로 3~6개가 가장 효과적)
+- **장면 수**: 최적의 수 선택 (일반적으로 3~4개가 가장 효과적)
 - **장면 길이**: 콘텐츠 필요에 따라 다양하게 설정 가능 (각 2~6초), 단 총 길이가 20초를 초과하지 않도록 합니다
 - **나레이션**: 장면 길이에 맞는 단어 수 (대략 초당 2~3단어)
 - **시각적 설명**: 세로형 이미지 생성에 맞게 구체적이고 상세하게 작성 (조명, 구도, 사물, 세로 프레이밍 등 언급)
@@ -58,7 +58,7 @@ CONTENT_PLANNER_PROMPT = """
 ```json
 {
   "topic": "완벽한 스크램블 에그",
-  "total_duration": 18,
+  "total_duration": 12,
   "scenes": [
     {
       "id": 1,
@@ -70,31 +70,15 @@ CONTENT_PLANNER_PROMPT = """
     },
     {
       "id": 2,
-      "narration": "달걀을 차가운 팬에 바로 깨 넣습니다",
-      "visual_description": "논스틱 팬에 달걀을 깨 넣는 손, 위에서 내려다보는 앵글",
-      "embedded_text": "Cold Pan Technique",
+      "narration": "달걀을 차가운 팬에 깨 넣고 고무 주걱으로 계속 저어줍니다",
+      "visual_description": "논스틱 팬에 달걀을 깨 넣고 주걱으로 젓는 손, 위에서 내려다보는 앵글",
+      "embedded_text": "Cold Pan + Keep Stirring",
       "embedded_text_location": "bottom left",
-      "duration": 3
-    },
-    {
-      "id": 3,
-      "narration": "고무 주걱으로 계속 저어줍니다",
-      "visual_description": "고무 주걱으로 팬 속 달걀을 부드럽게 젓는 모습, 측면 앵글",
-      "embedded_text": "Keep stirring",
-      "embedded_text_location": "middle right",
       "duration": 4
     },
     {
-      "id": 4,
-      "narration": "아직 촉촉할 때 불에서 내립니다",
-      "visual_description": "크리미한 스크램블 에그가 담긴 팬을 버너에서 들어 올리는 모습",
-      "embedded_text": "Remove Early",
-      "embedded_text_location": "top right",
-      "duration": 3
-    },
-    {
-      "id": 5,
-      "narration": "매번 완벽한 크리미 스크램블 에그 완성",
+      "id": 3,
+      "narration": "아직 촉촉할 때 불에서 내리면 완벽한 크리미 스크램블 에그 완성",
       "visual_description": "가니시가 얹힌 플레이팅된 스크램블 에그, 전문적인 음식 사진 조명",
       "embedded_text": "Perfect Results",
       "embedded_text_location": "center",
