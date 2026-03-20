@@ -129,7 +129,7 @@ def generate_thumbnail(args):
     client = OpenAI()
 
     result = client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1.5",
         prompt=thumbnail_prompt,
         quality="low",
         moderation="low",
@@ -217,7 +217,7 @@ def generate_hd_thumbnail(state: State):
     client = OpenAI()
 
     result = client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1.5",
         prompt=final_thumbnail_prompt,
         quality="high",
         moderation="low",
